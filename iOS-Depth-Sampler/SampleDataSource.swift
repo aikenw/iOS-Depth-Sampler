@@ -28,30 +28,30 @@ struct SampleDataSource {
             detail: "Depth visualization in real time using AV Foundation",
             classPrefix: "RealtimeDepth"
         ),
-        Sample(
-            title: "Real-time Depth Mask",
-            detail: "Blending a background image with a mask created from depth",
-            classPrefix: "RealtimeDepthMask"
-        ),
-        Sample(
-            title: "Depth from Camera Roll",
-            detail: "Depth visualization from pictures in the camera roll",
-            classPrefix: "DepthFromCameraRoll"
-        ),
-        Sample(
-            title: "Portrait Matte",
-            detail: "Background removal demo using Portrait Matte",
-            classPrefix: "PortraitMatte"
-        ),
-        Sample(
-            title: "ARKit Depth",
-            detail: "Depth visualization on ARKit",
-            classPrefix: "ARKitDepth"
-        ),
-        Sample(
-            title: "2D image in 3D space",
-            detail: "A demo to render a 2D image in 3D space",
-            classPrefix: "PointCloud"
-        ),
+//        Sample(
+//            title: "Real-time Depth Mask",
+//            detail: "Blending a background image with a mask created from depth",
+//            classPrefix: "RealtimeDepthMask"
+//        ),
+//        Sample(
+//            title: "Depth from Camera Roll",
+//            detail: "Depth visualization from pictures in the camera roll",
+//            classPrefix: "DepthFromCameraRoll"
+//        ),
+//        Sample(
+//            title: "Portrait Matte",
+//            detail: "Background removal demo using Portrait Matte",
+//            classPrefix: "PortraitMatte"
+//        ),
+//        Sample(
+//            title: "ARKit Depth",
+//            detail: "Depth visualization on ARKit",
+//            classPrefix: "ARKitDepth"
+//        ),
+//        Sample(
+//            title: "2D image in 3D space",
+//            detail: "A demo to render a 2D image in 3D space",
+//            classPrefix: "PointCloud"
+//        ),
         ]
 }

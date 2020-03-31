@@ -49,9 +49,51 @@ class VideoCapture: NSObject {
     private let depthDataOutput = AVCaptureDepthDataOutput()
     private let metadataOutput = AVCaptureMetadataOutput()
     
+    private var mutableData = Data()
+    private var count = 0
+    private lazy var calibrationDataFileURL: URL! = {
+        let documentPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).last!
+        let fileURL = URL(fileURLWithPath: documentPath).appendingPathComponent("calibrationdata.txt")
+        try? FileManager.default.removeItem(at: fileURL)
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            if !FileManager.default.createFile(atPath: fileURL.path, contents: nil, attributes: nil) {
+                print("Failed to create the log file: \(fileURL)!")
+                return nil // To trigger crash.
+            }
+        }
+        return fileURL
+    }()
+    private lazy var lensDistortionLookupTableDirectory: URL! = {
+        let documentPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).last!
+        let fileURL = URL(fileURLWithPath: documentPath).appendingPathComponent("lensDistortionLookupTable")
+        try? FileManager.default.removeItem(at: fileURL)
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+//            if !FileManager.default.createFile(atPath: fileURL.path, contents: nil, attributes: nil) {
+//                print("Failed to create the log file: \(fileURL)!")
+//                return nil // To trigger crash.
+//            }
+            try? FileManager.default.createDirectory(at: fileURL, withIntermediateDirectories: true, attributes: nil)
+        }
+        return fileURL
+    }()
+    
+    private var fileHandle1: FileHandle?
+    private var fileHandle2: FileHandle?
+    private lazy var ioQueue: DispatchQueue = {
+        return DispatchQueue(label: "ioQueue")
+    }()
+    
     init(cameraType: CameraType, preferredSpec: VideoSpec?, previewContainer: CALayer?)
     {
         super.init()
+        
+//        ioQueue.async { [weak self] in
+//            if let path = self?.lensDistortionLookupTableDirectory {
+//                try? FileManager.default.removeItem(at: path)
+//            }
+//        }
+        fileHandle1 = try? FileHandle(forUpdating: calibrationDataFileURL)
+//        fileHandle2 = try? FileHandle(forUpdating: lensDistortionLookupTableFileURL)
         
         captureSession.beginConfiguration()
         
@@ -75,7 +117,7 @@ class VideoCapture: NSObject {
             // video output
             videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
             videoDataOutput.alwaysDiscardsLateVideoFrames = true
-            videoDataOutput.setSampleBufferDelegate(self, queue: dataOutputQueue)
+//            videoDataOutput.setSampleBufferDelegate(self, queue: dataOutputQueue)
             guard captureSession.canAddOutput(videoDataOutput) else { fatalError() }
             captureSession.addOutput(videoDataOutput)
             videoConnection = videoDataOutput.connection(with: .video)
@@ -83,7 +125,7 @@ class VideoCapture: NSObject {
             // depth output
             guard captureSession.canAddOutput(depthDataOutput) else { fatalError() }
             captureSession.addOutput(depthDataOutput)
-            depthDataOutput.setDelegate(self, callbackQueue: dataOutputQueue)
+//            depthDataOutput.setDelegate(self, callbackQueue: dataOutputQueue)
             depthDataOutput.isFilteringEnabled = false
             guard let connection = depthDataOutput.connection(with: .depthData) else { fatalError() }
             connection.isEnabled = true
@@ -151,6 +193,10 @@ class VideoCapture: NSObject {
             return
         }
         captureSession.stopRunning()
+        ioQueue.async { [weak self] in
+            self?.fileHandle1?.closeFile()
+            self?.fileHandle2?.closeFile()
+        }
     }
     
     func resizePreview() {
@@ -229,6 +275,38 @@ extension VideoCapture: AVCaptureDataOutputSynchronizerDelegate {
             print("dropped depth:\(syncedDepthData)")
             depthData = nil
         }
+//        print("--->depthData: \(depthData)")
+        let calibrationData = depthData?.cameraCalibrationData
+//        print("timestamp: \(syncedVideoData.timestamp.seconds * 1000), \(calibrationData!.desc)")
+        let log = "timestamp: \(syncedVideoData.timestamp.seconds * 1000), \(calibrationData!.desc)\n"
+//        print("--->data: \(calibrationData!.lensDistortionLookupTable!)")
+        let fileURL = lensDistortionLookupTableDirectory.appendingPathComponent("\(syncedVideoData.timestamp.seconds * 1000).txt")
+        ioQueue.async { [weak self] in
+            if let data = log.data(using: .utf8) {
+                self?.fileHandle1?.seekToEndOfFile()
+                self?.fileHandle1?.write(data)
+            }
+            if let data = calibrationData?.lensDistortionLookupTable {
+//                self?.fileHandle2?.seekToEndOfFile()
+//                self?.fileHandle2?.write("\ntimestamp: \(syncedVideoData.timestamp.seconds * 1000), ".data(using: .utf8)!)
+//                self?.fileHandle2?.seekToEndOfFile()
+//                self?.fileHandle2?.write(data)
+//                self?.fileHandle2?.closeFile()
+//                self?.fileHandle2 = nil
+                
+                try? data.write(to: fileURL)
+            }
+        }
+//        print("--->intrinsic: \(calibrationData!.intrinsicMatrix)")
+//        print("--->extrinsic: \(calibrationData!.extrinsicMatrix)")
+//        if count == 3 {
+//            try? self.mutableData.write(to: self.filePath)
+//        }
+//        mutableData.append(log.data(using: .utf8)!)
+//        mutableData.append(calibrationData!.lensDistortionLookupTable!)
+//        count += 1
+        
+        
 
         // 顔のある位置のしきい値を求める
         let syncedMetaData = synchronizedDataCollection.synchronizedData(for: metadataOutput) as? AVCaptureSynchronizedMetadataObjectData
@@ -239,5 +317,26 @@ extension VideoCapture: AVCaptureDataOutputSynchronizerDelegate {
         guard let imagePixelBuffer = CMSampleBufferGetImageBuffer(videoSampleBuffer) else { fatalError() }
 
         syncedDataBufferHandler?(imagePixelBuffer, depthData, face)
+    }
+}
+
+extension AVCameraCalibrationData {
+    var desc: String {
+//        let dataString1: String
+//        if let table = lensDistortionLookupTable, let string = String(data: table, encoding: .utf32) {
+//            dataString1 = string
+//        } else {
+//            dataString1 = ""
+//        }
+        
+        var res = ""
+        res += "intrinsicMatrix: \(intrinsicMatrix), "
+        res += "intrinsicMatrixReferenceDimensions: \(intrinsicMatrixReferenceDimensions), "
+        res += "extrinsicMatrix: \(extrinsicMatrix), "
+        res += "pixelSize: \(pixelSize), "
+        res += "lensDistortionCenter: \(lensDistortionCenter)"
+//        res += "lensDistortionLookupTable: \(dataString1)"
+//        res += "inverseLensDistortionLookupTable: \(inverseLensDistortionLookupTable ?? Data())"
+        return res
     }
 }
