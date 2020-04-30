@@ -278,7 +278,7 @@ extension VideoCapture: AVCaptureDataOutputSynchronizerDelegate {
 //        print("--->depthData: \(depthData)")
         let calibrationData = depthData?.cameraCalibrationData
 //        print("timestamp: \(syncedVideoData.timestamp.seconds * 1000), \(calibrationData!.desc)")
-        let log = "timestamp: \(syncedVideoData.timestamp.seconds * 1000), \(calibrationData!.desc)\n"
+        let log = "timestamp: \(syncedVideoData.timestamp.seconds * 1000), \(calibrationData?.desc ?? "")\n"
 //        print("--->data: \(calibrationData!.lensDistortionLookupTable!)")
         let fileURL = lensDistortionLookupTableDirectory.appendingPathComponent("\(syncedVideoData.timestamp.seconds * 1000).txt")
         ioQueue.async { [weak self] in
